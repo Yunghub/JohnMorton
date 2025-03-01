@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Trash Classifier with OpenCV Stream</title>
+    <style>
+        body { 
+            text-align: center; 
+            font-family: Arial, sans-serif; 
+        }
+        #video_feed { 
+            border: 1px solid #ccc; 
+        }
+        button { 
+            margin: 10px; 
+            padding: 10px 20px; 
+            font-size: 16px; 
+        }
+        #result { 
+            margin-top: 20px; 
+            font-size: 20px; 
+            font-weight: bold; 
+        }
+    </style>
+</head>
+<body>
+    <h1>Trash Classifier</h1>
+    <!-- Display the MJPEG stream from OpenCV -->
+    <img id="video_feed" src="{{ url_for('video_feed') }}" width="640" height="480">
+    <br>
+    <!-- Buttons for training and classification -->
+    <button onclick="captureAndTrain('recyclable')">Recyclable</button>
+    <button onclick="captureAndTrain('non_recyclable')">Non-Recyclable</button>
+    <button onclick="captureAndClassify()">Classify</button>
+    <div id="result"></div>
+
+    <script>
+        function captureAndTrain(label) {
+            // Send a POST request to /train with the chosen label.
+            fetch('/train', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded'
+                },
+                body: new URLSearchParams({ label: label })
+            })
+            .then(response => response.json())
+            .then(data => {
+                document.getElementById("result").innerText = data.message || data.error;
+            })
+            .catch(error => console.error('Error:', error));
+        }
+
+        function captureAndClassify() {
+            // Send a POST request to /classify to capture and classify the current frame.
+            fetch('/classify', {
+                method: 'POST'
+            })
+            .then(response => response.json())
+            .then(data => {
+                document.getElementById("result").innerText = "Classification Result: " + data.result;
+            })
+            .catch(error => console.error('Error:', error));
+        }
+    </script>
+</body>
+</html>
