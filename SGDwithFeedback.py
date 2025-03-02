@@ -16,7 +16,7 @@ import joblib
 app = Flask(__name__)
 
 # Global VideoCapture object (adjust the index if needed)
-cap = cv2.VideoCapture(2)
+cap = cv2.VideoCapture(1)
 if not cap.isOpened():
     print("Error: Unable to access the camera.")
 
@@ -37,8 +37,8 @@ for path in [DATASET_PATH, RECYCLE_PATH, NON_RECYCLE_PATH, TEMP_PATH]:
 automatic_mode = False
 
 # Motion detection parameters
-MIN_CONTOUR_AREA = 1000  # Minimum area of motion contour to trigger detection
-MOTION_DELAY = 5  # Delay in seconds after motion is detected
+MIN_CONTOUR_AREA = 2000  # Minimum area of motion contour to trigger detection
+MOTION_DELAY = 0  # Delay in seconds after motion is detected
 BACKGROUND_SUBTRACTOR = cv2.createBackgroundSubtractorMOG2(history=500, varThreshold=50, detectShadows=True)
 
 # Initialize the classifier and feature extractor
@@ -320,7 +320,7 @@ def gen_frames():
 
 @app.route('/')
 def index():
-    return render_template('index2.html')
+    return render_template('index.html')
 
 @app.route('/video_feed')
 def video_feed():
@@ -397,7 +397,7 @@ def classify_route():
     result = classify_image(frame)
     
     try:
-        ser = serial.Serial('COM9', 115200, timeout=1)
+        ser = serial.Serial('COM4', 115200, timeout=1)
         if result == "Recyclable":
             ser.write(b'recyclable\n')
             print("Sent: recyclable")
@@ -492,9 +492,9 @@ def automatic_monitor():
                     
                     print(f"Automatic classification results: {results}, final: {final_result}")
                     
-                    # Send command via COM9
+                    # Send command via COM4
                     try:
-                        ser = serial.Serial('COM9', 115200, timeout=1)
+                        ser = serial.Serial('COM4', 115200, timeout=1)
                         if final_result == "Recyclable":
                             ser.write(b'recyclable\n')
                             print("Sent: recyclable")
