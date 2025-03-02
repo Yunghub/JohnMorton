@@ -4,7 +4,7 @@ import os
 import time
 from flask import Flask, render_template, Response, request, jsonify
 import serial
-import time
+import threading
 
 app = Flask(__name__)
 
@@ -23,13 +23,27 @@ for path in [RECYCLE_PATH, NON_RECYCLE_PATH]:
     if not os.path.exists(path):
         os.makedirs(path)
 
+# Global flag to control automatic mode
+automatic_mode = False
+
 def capture_frame():
-    """Captures a single frame from the global camera."""
+    """Captures a single frame from the global camera and applies zoom by cropping."""
     global cap
     ret, frame = cap.read()
     if not ret:
         return None
-    return frame
+
+    # Apply zoom by cropping the center of the frame.
+    height, width = frame.shape[:2]
+    zoom_factor = 2  # Adjust this value to change the zoom level (higher = more zoomed in)
+    new_width = width // zoom_factor
+    new_height = height // zoom_factor
+    start_x = (width - new_width) // 2
+    start_y = (height - new_height) // 2
+    cropped = frame[start_y:start_y+new_height, start_x:start_x+new_width]
+    # Resize the cropped image back to original dimensions (or desired streaming size)
+    zoomed_frame = cv2.resize(cropped, (width, height))
+    return zoomed_frame
 
 def compute_matches(img1, img2):
     """Uses ORB feature detection and BFMatcher to compare two images."""
@@ -80,8 +94,8 @@ def gen_frames():
     """Generator function that reads frames from the camera and yields them as MJPEG."""
     global cap
     while True:
-        ret, frame = cap.read()
-        if not ret:
+        frame = capture_frame()
+        if frame is None:
             break
         ret, buffer = cv2.imencode('.jpg', frame)
         frame_bytes = buffer.tobytes()
@@ -95,8 +109,7 @@ def index():
 @app.route('/video_feed')
 def video_feed():
     """Route to stream the video feed."""
-    return Response(gen_frames(),
-                    mimetype='multipart/x-mixed-replace; boundary=frame')
+    return Response(gen_frames(), mimetype='multipart/x-mixed-replace; boundary=frame')
 
 @app.route('/train', methods=['POST'])
 def train():
@@ -136,7 +149,6 @@ def classify_route():
 
     result = classify_image(frame)
     
-    # Open serial connection on COM9 with baud rate 115200 and send command
     try:
         ser = serial.Serial('COM9', 115200, timeout=1)
         if result == "Recyclable":
@@ -156,10 +168,66 @@ def classify_route():
 
     return jsonify({"result": result})
 
+@app.route('/toggle_automatic', methods=['POST'])
+def toggle_automatic():
+    global automatic_mode
+    mode = request.form.get("mode")
+    if mode == "on":
+        automatic_mode = True
+        message = "Automatic mode enabled."
+    elif mode == "off":
+        automatic_mode = False
+        message = "Automatic mode disabled."
+    else:
+        return jsonify({"error": "Invalid mode."}), 400
+    return jsonify({"message": message})
+
+def automatic_monitor():
+    """Background thread that monitors COM13 and triggers classification when 'PIR Flag: True' is detected."""
+    while True:
+        if automatic_mode:
+            try:
+                ser_auto = serial.Serial('COM13', 115200, timeout=1)
+                line = ser_auto.readline().decode('utf-8').strip()
+                if "PIR Flag: True" in line:
+                    print("PIR flag detected, performing classification automatically.")
+                    frame = capture_frame()
+                    if frame is not None:
+                        result = classify_image(frame)
+                        print("Automatic classification result:", result)
+
+
+                        try:
+                            ser = serial.Serial('COM9', 115200, timeout=1)
+                            if result == "Recyclable":
+                                ser.write(b'recyclable\n')
+                                print("Sent: recyclable")
+                                time.sleep(3)
+                            elif result == "Non-Recyclable":
+                                ser.write(b'non_recyclable\n')
+                                print("Sent: non_recyclable")
+                                time.sleep(3)
+                            else:
+                                print("Unknown classification result, no command sent.")
+                            ser.close()
+                        except Exception as e:
+                            print("Serial communication error:", e)
+                            return jsonify({"error": "Serial communication error"}), 500
+
+
+                    else:
+                        print("Failed to capture frame during automatic classification.")
+                ser_auto.close()
+            except Exception as e:
+                print("Error in automatic monitor:", e)
+        time.sleep(1)
+
 if __name__ == '__main__':
+    monitor_thread = threading.Thread(target=automatic_monitor, daemon=True)
+    monitor_thread.start()
     try:
-        # Run the Flask app on all interfaces (0.0.0.0) and port 5000.
         app.run(host="0.0.0.0", port=5000, debug=True)
     finally:
         cap.release()
         cv2.destroyAllWindows()
+    
