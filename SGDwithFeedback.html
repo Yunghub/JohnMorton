@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Smart Recycling Assistant</title>
+    <title>BINCREDIBLE</title>
     <style>
         * {
             margin: 0;
@@ -25,11 +25,27 @@
         h1 {
             font-size: 2.8rem;
             margin-bottom: 10px;
-            color: #fff;
             text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5);
             position: relative;
             display: inline-block;
         }
+
+        h1 span {
+            display: inline-block;
+        }
+
+        /* Progressive orange gradient for each letter */
+        h1 span:nth-child(1) { color: #ffbd59; } /* B - lightest */
+        h1 span:nth-child(2) { color: #ffbd59; } /* I */
+        h1 span:nth-child(3) { color: #ffbd59; } /* N */
+        h1 span:nth-child(4) { color: #ff914d; } /* C */
+        h1 span:nth-child(5) { color: #ff914d; } /* R */
+        h1 span:nth-child(6) { color: #ff914d; } /* E */
+        h1 span:nth-child(7) { color: #ff914d; } /* D */
+        h1 span:nth-child(8) { color: #ff914d; } /* I */
+        h1 span:nth-child(9) { color: #ff914d; } /* B */
+        h1 span:nth-child(10) { color: #ff914d; } /* L */
+        h1 span:nth-child(11) { color: #ff914d; } /* E - darkest */
 
         h1:after {
             content: '';
@@ -39,11 +55,10 @@
             transform: translateX(-50%);
             width: 60%;
             height: 4px;
-            background: linear-gradient(90deg, transparent, #ff7a33, transparent);
+            background: linear-gradient(90deg, #ffbd59, #ff914d);
             border-radius: 2px;
         }
-
-        .subtitle {
+            .subtitle {
             color: #bbbbbb;
             margin-bottom: 30px;
             font-size: 1.1rem;
@@ -251,6 +266,53 @@
             color: #bbbbbb;
         }
 
+        /* Model info styles */
+        #modelInfo {
+            margin-top: 20px;
+            padding: 15px;
+            background: rgba(30, 30, 30, 0.5);
+            border-radius: 10px;
+            max-width: 80%;
+            margin-left: auto;
+            margin-right: auto;
+            font-size: 0.9rem;
+            color: #bbbbbb;
+        }
+
+        #advancedControls {
+            display: none;
+            flex-direction: column;
+            align-items: center;
+            margin-top: 25px;
+            padding-top: 25px;
+            border-top: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .advanced-section-title {
+            font-size: 1.3rem;
+            margin-bottom: 15px;
+            color: #ff7a33;
+        }
+
+        /* Advanced toggle */
+        #advancedToggle {
+            background: none;
+            border: none;
+            color: #bbbbbb;
+            font-size: 0.9rem;
+            cursor: pointer;
+            margin-top: 20px;
+            transition: all 0.3s ease;
+            padding: 8px 15px;
+            border-radius: 5px;
+            background: rgba(30, 30, 30, 0.5);
+        }
+
+        #advancedToggle:hover {
+            color: #ff7a33;
+            background: rgba(40, 40, 40, 0.7);
+        }
+
         @keyframes spin {
             0% { transform: rotate(0deg); }
             100% { transform: rotate(360deg); }
@@ -286,7 +348,9 @@
 </head>
 <body>
     <div class="container">
-        <h1>Smart Recycling Assistant</h1>
+        <h1>
+            <span>B</span><span>I</span><span>N</span><span>C</span><span>R</span><span>E</span><span>D</span><span>I</span><span>B</span><span>L</span><span>E</span>
+        </h1>
         <p class="subtitle">Advanced computer vision for waste classification</p>
         
         <!-- Automatic mode toggle -->
@@ -330,9 +394,33 @@
                 <span class="icon">🗑️</span>It's Actually Non-Recyclable
             </button>
         </div>
+        
+        <!-- Model Information Display -->
+        <div id="modelInfo"></div>
+        
+        <!-- Advanced Controls Toggle Button -->
+        <button id="advancedToggle" onclick="toggleAdvancedControls()">Show Advanced Options</button>
+        
+        <!-- Advanced Controls -->
+        <div id="advancedControls">
+            <h3 class="advanced-section-title">Advanced Options</h3>
+            <button onclick="resetModel()" style="background: #8B0000;">
+                <span class="icon">❌</span>Reset Model
+            </button>
+        </div>
     </div>
 
     <script>
+        // Global variables to track state
+        let lastClassificationResult = null;
+        
+        // Initialize page
+        document.addEventListener('DOMContentLoaded', function() {
+            refreshModelInfo();
+            // Check for last classification every 5 seconds in auto mode
+            setInterval(checkLastClassification, 5000);
+        });
+        
         function toggleAutoMode() {
             var autoSwitch = document.getElementById("autoSwitch");
             var manualControls = document.getElementById("manualControls");
@@ -380,6 +468,7 @@
                 showResult(data.message || data.error, "training");
                 // Hide feedback controls after training
                 document.getElementById("feedbackControls").style.display = "none";
+                refreshModelInfo(); // Update model info after training
             })
             .catch(error => {
                 console.error('Error:', error);
@@ -398,6 +487,7 @@
             .then(response => response.json())
             .then(data => {
                 hideLoading();
+                lastClassificationResult = data.result;
                 let resultClass = "unknown";
                 if (data.result === "Recyclable") resultClass = "recyclable";
                 else if (data.result === "Non-Recyclable") resultClass = "non-recyclable";
@@ -434,6 +524,7 @@
                 showResult(data.message || data.error, "training");
                 // Hide feedback controls after providing feedback
                 document.getElementById("feedbackControls").style.display = "none";
+                refreshModelInfo(); // Update model info after feedback
             })
             .catch(error => {
                 console.error('Error:', error);
@@ -458,6 +549,84 @@
         
         function hideLoading() {
             document.getElementById("loadingAnimation").style.display = "none";
+        }
+        
+        function resetModel() {
+            if (confirm("Are you sure you want to reset the model? This will delete all training data and cannot be undone.")) {
+                showLoading();
+                fetch('/reset_model', {
+                    method: 'POST'
+                })
+                .then(response => response.json())
+                .then(data => {
+                    hideLoading();
+                    showResult(data.message, "training");
+                    refreshModelInfo();
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    hideLoading();
+                    showResult("Failed to reset model", "unknown");
+                });
+            }
+        }
+        
+        function refreshModelInfo() {
+            fetch('/model_info')
+                .then(response => response.json())
+                .then(data => {
+                    const modelInfoElement = document.getElementById("modelInfo");
+                    
+                    // Create model status text
+                    let status = data.model_trained ? "Trained" : "Untrained";
+                    let statusColor = data.model_trained ? "#4caf50" : "#f44336";
+                    
+                    modelInfoElement.innerHTML = `
+                        <strong>Model Status:</strong> <span style="color: ${statusColor}">${status}</span><br>
+                        <strong>Training Samples:</strong> ${data.total_samples} 
+                        (♻️ ${data.recyclable_samples} recyclable, 
+                        🗑️ ${data.non_recyclable_samples} non-recyclable)
+                    `;
+                })
+                .catch(error => {
+                    console.error('Error fetching model info:', error);
+                    document.getElementById("modelInfo").innerHTML = 
+                        "<span style='color: #f44336'>Failed to load model information</span>";
+                });
+        }
+        
+        function toggleAdvancedControls() {
+            const advancedControls = document.getElementById("advancedControls");
+            const toggleButton = document.getElementById("advancedToggle");
+            
+            if (advancedControls.style.display === "flex") {
+                advancedControls.style.display = "none";
+                toggleButton.textContent = "Show Advanced Options";
+            } else {
+                advancedControls.style.display = "flex";
+                toggleButton.textContent = "Hide Advanced Options";
+            }
+        }
+        
+        function checkLastClassification() {
+            // Only check in auto mode
+            if (document.getElementById("autoSwitch").checked) {
+                fetch('/get_last_classification')
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.result !== "None" && data.result !== lastClassificationResult) {
+                            lastClassificationResult = data.result;
+                            let resultClass = "unknown";
+                            if (data.result === "Recyclable") resultClass = "recyclable";
+                            else if (data.result === "Non-Recyclable") resultClass = "non-recyclable";
+                            
+                            showResult("Auto Classification: " + data.result, resultClass);
+                        }
+                    })
+                    .catch(error => {
+                        console.error('Error checking classification:', error);
+                    });
+            }
         }
     </script>
 </body>
